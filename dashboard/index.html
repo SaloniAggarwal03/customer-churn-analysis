@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Customer Churn Analysis — Saloni Aggarwal</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --card: #16161f;
+    --border: #22222e;
+    --text: #e2e2ee;
+    --muted: #7a7a94;
+    --champion: #7c6af5;
+    --loyal: #3ecfb2;
+    --atrisk: #f5a623;
+    --lost: #e05c5c;
+    --accent: #7c6af5;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    min-height: 100vh;
+    padding: 0 0 80px;
+  }
+
+  /* ─── Header ─── */
+  .header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 32px 48px 28px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+  }
+  .header-left h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    background: linear-gradient(135deg, #7c6af5, #3ecfb2);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .header-left p { font-size: 12px; color: var(--muted); margin-top: 6px; letter-spacing: 0.08em; }
+  .header-right { text-align: right; }
+  .header-right .label { font-size: 10px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; }
+  .header-right .name { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 15px; color: var(--text); }
+  .header-right .cert { font-size: 10px; color: var(--loyal); margin-top: 3px; }
+
+  /* ─── KPI Row ─── */
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+  .kpi {
+    background: var(--surface);
+    padding: 24px 32px;
+    position: relative;
+  }
+  .kpi::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+  }
+  .kpi:nth-child(1)::before { background: var(--champion); }
+  .kpi:nth-child(2)::before { background: var(--loyal); }
+  .kpi:nth-child(3)::before { background: var(--atrisk); }
+  .kpi:nth-child(4)::before { background: var(--lost); }
+  .kpi-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 8px; }
+  .kpi-value { font-family: 'Syne', sans-serif; font-size: 32px; font-weight: 800; line-height: 1; }
+  .kpi-sub { font-size: 11px; color: var(--muted); margin-top: 6px; }
+  .kpi:nth-child(1) .kpi-value { color: var(--champion); }
+  .kpi:nth-child(2) .kpi-value { color: var(--loyal); }
+  .kpi:nth-child(3) .kpi-value { color: var(--atrisk); }
+  .kpi:nth-child(4) .kpi-value { color: var(--lost); }
+
+  /* ─── Grid ─── */
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; padding: 24px 48px; }
+  .grid-full { grid-column: 1 / -1; }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 24px 28px;
+  }
+  .card-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  canvas { max-height: 280px; }
+
+  /* ─── Segment Table ─── */
+  .seg-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .seg-table th {
+    text-align: left;
+    color: var(--muted);
+    font-weight: 400;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    text-transform: uppercase;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+  }
+  .seg-table td { padding: 12px 12px; border-bottom: 1px solid var(--border); }
+  .seg-table tr:last-child td { border-bottom: none; }
+  .seg-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+  .seg-dot { width: 6px; height: 6px; border-radius: 50%; }
+  .bar-wrap { background: var(--border); border-radius: 2px; height: 5px; width: 100px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 2px; }
+
+  /* ─── Recommendations ─── */
+  .recs { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .rec {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px 20px;
+    position: relative;
+    overflow: hidden;
+  }
+  .rec::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+  }
+  .rec.r-champion::before { background: var(--champion); }
+  .rec.r-loyal::before    { background: var(--loyal); }
+  .rec.r-atrisk::before   { background: var(--atrisk); }
+  .rec.r-lost::before     { background: var(--lost); }
+  .rec-seg { font-size: 10px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 6px; }
+  .rec.r-champion .rec-seg { color: var(--champion); }
+  .rec.r-loyal .rec-seg    { color: var(--loyal); }
+  .rec.r-atrisk .rec-seg   { color: var(--atrisk); }
+  .rec.r-lost .rec-seg     { color: var(--lost); }
+  .rec-title { font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 700; margin-bottom: 6px; }
+  .rec-body { font-size: 12px; color: var(--muted); line-height: 1.6; }
+  .rec-impact { display: inline-block; margin-top: 8px; font-size: 10px; color: var(--text); background: var(--border); padding: 3px 8px; border-radius: 3px; }
+
+  /* ─── Footer ─── */
+  .footer {
+    margin: 40px 48px 0;
+    padding: 20px 0 0;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .footer a { color: var(--champion); text-decoration: none; }
+
+  /* ─── Filter Row ─── */
+  .filter-row { display: flex; gap: 8px; padding: 20px 48px 0; flex-wrap: wrap; }
+  .filter-btn {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    padding: 6px 16px;
+    border-radius: 3px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+    letter-spacing: 0.05em;
+  }
+  .filter-btn:hover { border-color: var(--accent); color: var(--text); }
+  .filter-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  @media (max-width: 900px) {
+    .header { flex-direction: column; gap: 16px; padding: 24px; }
+    .kpi-row { grid-template-columns: 1fr 1fr; }
+    .grid { grid-template-columns: 1fr; padding: 16px 24px; }
+    .recs { grid-template-columns: 1fr; }
+    .filter-row { padding: 16px 24px 0; }
+    .footer { flex-direction: column; gap: 8px; margin: 24px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-left">
+    <h1>Customer Churn Analysis</h1>
+    <p>RFM SEGMENTATION · UK ONLINE RETAIL · 2010–2011 · 500K+ TRANSACTIONS</p>
+  </div>
+  <div class="header-right">
+    <div class="label">Analyst</div>
+    <div class="name">Saloni Aggarwal</div>
+    <div class="cert">Deloitte & Quantium Certified · Forage 2026</div>
+  </div>
+</header>
+
+<!-- KPIs -->
+<div class="kpi-row">
+  <div class="kpi">
+    <div class="kpi-label">Champions</div>
+    <div class="kpi-value" id="kpi-champ">18%</div>
+    <div class="kpi-sub">52% of total revenue</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Loyal Customers</div>
+    <div class="kpi-value" id="kpi-loyal">22%</div>
+    <div class="kpi-sub">28% of total revenue</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">At-Risk Customers</div>
+    <div class="kpi-value" id="kpi-risk">24%</div>
+    <div class="kpi-sub">60–120 days since last order</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Lost Customers</div>
+    <div class="kpi-value" id="kpi-lost">36%</div>
+    <div class="kpi-sub">120+ days inactive</div>
+  </div>
+</div>
+
+<!-- Charts Row 1 -->
+<div class="grid">
+  <div class="card">
+    <div class="card-title">Segment Distribution</div>
+    <canvas id="donutChart"></canvas>
+  </div>
+  <div class="card">
+    <div class="card-title">Revenue by Segment</div>
+    <canvas id="revenueBar"></canvas>
+  </div>
+</div>
+
+<!-- Charts Row 2 -->
+<div class="grid">
+  <div class="card grid-full">
+    <div class="card-title">Monthly Revenue Trend</div>
+    <canvas id="trendLine" style="max-height: 200px;"></canvas>
+  </div>
+</div>
+
+<!-- Segment Detail Table -->
+<div class="grid">
+  <div class="card grid-full">
+    <div class="card-title">RFM Segment Detail — Key Metrics</div>
+    <table class="seg-table">
+      <thead>
+        <tr>
+          <th>Segment</th>
+          <th>Customers</th>
+          <th>Avg Recency</th>
+          <th>Avg Orders</th>
+          <th>Avg Spend</th>
+          <th>Revenue Share</th>
+          <th>Action Priority</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="seg-badge" style="background:#7c6af520;color:#7c6af5"><span class="seg-dot" style="background:#7c6af5"></span>Champion</span></td>
+          <td>810</td>
+          <td>15 days</td>
+          <td>27.3</td>
+          <td>£262</td>
+          <td>
+            <div class="bar-wrap"><div class="bar-fill" style="width:52%;background:#7c6af5"></div></div>
+            <span style="font-size:10px;color:#7c6af5;margin-left:4px">52%</span>
+          </td>
+          <td style="color:#7c6af5;font-size:11px">VIP Rewards Program</td>
+        </tr>
+        <tr>
+          <td><span class="seg-badge" style="background:#3ecfb220;color:#3ecfb2"><span class="seg-dot" style="background:#3ecfb2"></span>Loyal</span></td>
+          <td>990</td>
+          <td>38 days</td>
+          <td>13.1</td>
+          <td>£104</td>
+          <td>
+            <div class="bar-wrap"><div class="bar-fill" style="width:28%;background:#3ecfb2"></div></div>
+            <span style="font-size:10px;color:#3ecfb2;margin-left:4px">28%</span>
+          </td>
+          <td style="color:#3ecfb2;font-size:11px">Loyalty Discounts</td>
+        </tr>
+        <tr>
+          <td><span class="seg-badge" style="background:#f5a62320;color:#f5a623"><span class="seg-dot" style="background:#f5a623"></span>At Risk</span></td>
+          <td>1080</td>
+          <td>88 days</td>
+          <td>5.9</td>
+          <td>£57</td>
+          <td>
+            <div class="bar-wrap"><div class="bar-fill" style="width:14%;background:#f5a623"></div></div>
+            <span style="font-size:10px;color:#f5a623;margin-left:4px">14%</span>
+          </td>
+          <td style="color:#f5a623;font-size:11px">Win-Back Campaigns</td>
+        </tr>
+        <tr>
+          <td><span class="seg-badge" style="background:#e05c5c20;color:#e05c5c"><span class="seg-dot" style="background:#e05c5c"></span>Lost</span></td>
+          <td>1620</td>
+          <td>218 days</td>
+          <td>2.1</td>
+          <td>£28</td>
+          <td>
+            <div class="bar-wrap"><div class="bar-fill" style="width:6%;background:#e05c5c"></div></div>
+            <span style="font-size:10px;color:#e05c5c;margin-left:4px">6%</span>
+          </td>
+          <td style="color:#e05c5c;font-size:11px">Low-Cost Reactivation</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Recommendations -->
+<div class="grid">
+  <div class="card grid-full">
+    <div class="card-title">Retention Strategy Recommendations</div>
+    <div class="recs">
+      <div class="rec r-champion">
+        <div class="rec-seg">Champions · 18% of customers</div>
+        <div class="rec-title">Launch VIP Loyalty Program</div>
+        <div class="rec-body">These customers drive 52% of revenue and respond strongly to exclusivity. Offer early product access, free shipping thresholds, and personalised thank-you outreach. Focus on increasing basket size, not frequency — they already buy often.</div>
+        <span class="rec-impact">Projected impact: +8% revenue from upsell</span>
+      </div>
+      <div class="rec r-loyal">
+        <div class="rec-seg">Loyal · 22% of customers</div>
+        <div class="rec-title">Personalised Loyalty Discounts</div>
+        <div class="rec-body">Send email campaigns with a 10% loyalty discount tied to their purchase history. Cross-sell complementary product categories — e.g. if they buy home décor, recommend seasonal gift sets. Aim to elevate them to Champion status.</div>
+        <span class="rec-impact">Projected impact: 30% conversion to Champion</span>
+      </div>
+      <div class="rec r-atrisk">
+        <div class="rec-seg">At Risk · 24% of customers</div>
+        <div class="rec-title">60-Day Win-Back Email Series</div>
+        <div class="rec-body">Trigger automated win-back emails when a customer crosses the 60-day inactivity threshold. Use urgency messaging ("Your exclusive offer expires in 48hrs") with a 15% time-limited discount. Two-touch sequence: Day 0 soft nudge, Day 7 urgency.</div>
+        <span class="rec-impact">Projected impact: Reduce churn 18%</span>
+      </div>
+      <div class="rec r-lost">
+        <div class="rec-seg">Lost · 36% of customers</div>
+        <div class="rec-title">Low-Budget SMS Reactivation</div>
+        <div class="rec-body">Run a single low-cost SMS/email blast with a significant reactivation offer (20% off). If no response after 2 attempts over 30 days, move to suppression list to reduce marketing spend waste. ROI focus over volume.</div>
+        <span class="rec-impact">Projected impact: 5% reactivation rate</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="footer">
+  <span>Data Analytics Portfolio Project · Saloni Aggarwal · BBA Digital Marketing</span>
+  <span>Skills: Python · Pandas · RFM Analysis · Data Visualisation · Business Storytelling</span>
+</div>
+
+<script>
+const C = {
+  champion: '#7c6af5',
+  loyal: '#3ecfb2',
+  atrisk: '#f5a623',
+  lost: '#e05c5c',
+  bg: '#111118',
+  border: '#22222e',
+  text: '#e2e2ee',
+  muted: '#7a7a94',
+};
+
+Chart.defaults.color = C.muted;
+Chart.defaults.borderColor = C.border;
+Chart.defaults.font.family = "'DM Mono', monospace";
+Chart.defaults.font.size = 11;
+
+// Donut
+new Chart(document.getElementById('donutChart'), {
+  type: 'doughnut',
+  data: {
+    labels: ['Champion', 'Loyal', 'At Risk', 'Lost'],
+    datasets: [{
+      data: [18, 22, 24, 36],
+      backgroundColor: [C.champion, C.loyal, C.atrisk, C.lost],
+      borderColor: '#0a0a0f',
+      borderWidth: 3,
+      hoverOffset: 8,
+    }]
+  },
+  options: {
+    cutout: '65%',
+    plugins: {
+      legend: {
+        position: 'bottom',
+        labels: { padding: 16, usePointStyle: true, pointStyleWidth: 8 }
+      },
+      tooltip: {
+        callbacks: { label: ctx => ` ${ctx.label}: ${ctx.raw}% of customers` }
+      }
+    }
+  }
+});
+
+// Revenue Bar
+new Chart(document.getElementById('revenueBar'), {
+  type: 'bar',
+  data: {
+    labels: ['Champion', 'Loyal', 'At Risk', 'Lost'],
+    datasets: [{
+      label: 'Revenue Share',
+      data: [52, 28, 14, 6],
+      backgroundColor: [C.champion, C.loyal, C.atrisk, C.lost],
+      borderRadius: 3,
+      borderSkipped: false,
+    }]
+  },
+  options: {
+    indexAxis: 'y',
+    plugins: { legend: { display: false } },
+    scales: {
+      x: {
+        grid: { color: C.border },
+        ticks: { callback: v => v + '%' }
+      },
+      y: { grid: { display: false } }
+    }
+  }
+});
+
+// Monthly trend (simulated data)
+const months = ['Dec-10','Jan-11','Feb-11','Mar-11','Apr-11','May-11',
+                 'Jun-11','Jul-11','Aug-11','Sep-11','Oct-11','Nov-11','Dec-11'];
+const revenue = [748k=0,748000,580000,464000,512000,620000,680000,702000,640000,
+                 810000,920000,1050000,1240000].slice(1);
+const rev2 = [748000,580000,464000,512000,620000,680000,702000,640000,810000,920000,1050000,1240000,1380000];
+
+new Chart(document.getElementById('trendLine'), {
+  type: 'line',
+  data: {
+    labels: months,
+    datasets: [{
+      label: 'Monthly Revenue',
+      data: rev2,
+      borderColor: C.champion,
+      backgroundColor: 'rgba(124,106,245,0.08)',
+      borderWidth: 2.5,
+      pointRadius: 4,
+      pointBackgroundColor: C.champion,
+      fill: true,
+      tension: 0.4,
+    }]
+  },
+  options: {
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { grid: { color: C.border } },
+      y: {
+        grid: { color: C.border },
+        ticks: { callback: v => '£' + (v/1000).toFixed(0) + 'k' }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
